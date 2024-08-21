@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Processamento de Imagem</title>
     <style>
+        /* Estilo para o canvas e o container que os envolve */
         canvas {
             border: 1px solid black;
             margin: 10px;
@@ -16,28 +17,37 @@
     </style>
 </head>
 <body>
+    <!-- Input para carregar uma imagem -->
     <input type="file" id="fileInput" />
+    
+    <!-- Container para os canvas -->
     <div id="container">
         <canvas id="canvasOriginal"></canvas>
         <canvas id="canvasBlurred"></canvas>
         <canvas id="canvasEdges"></canvas>
     </div>
+
     <script>
+        // Selecionando os elementos de entrada de arquivo e os canvas
         const fileInput = document.getElementById('fileInput');
         const canvasOriginal = document.getElementById('canvasOriginal');
         const canvasBlurred = document.getElementById('canvasBlurred');
         const canvasEdges = document.getElementById('canvasEdges');
+        
+        // Obtendo os contextos de desenho dos canvas
         const ctxOriginal = canvasOriginal.getContext('2d');
         const ctxBlurred = canvasBlurred.getContext('2d');
         const ctxEdges = canvasEdges.getContext('2d');
 
+        // Evento disparado quando um arquivo é selecionado
         fileInput.addEventListener('change', (event) => {
-            const file = event.target.files[0];
-            const reader = new FileReader();
+            const file = event.target.files[0]; // Obtendo o arquivo selecionado
+            const reader = new FileReader(); // Criando um leitor de arquivos
 
             reader.onload = function (e) {
-                const img = new Image();
+                const img = new Image(); // Criando um novo objeto de imagem
                 img.onload = function () {
+                    // Ajustando o tamanho dos canvas para o tamanho da imagem
                     canvasOriginal.width = img.width;
                     canvasOriginal.height = img.height;
                     canvasBlurred.width = img.width;
@@ -45,30 +55,32 @@
                     canvasEdges.width = img.width;
                     canvasEdges.height = img.height;
 
-                    // Desenhar a imagem original
+                    // Desenhando a imagem original no canvas correspondente
                     ctxOriginal.drawImage(img, 0, 0);
 
-                    // Aplicar desfoque e desenhar
+                    // Aplicando desfoque e desenhando no canvas correspondente
                     ctxBlurred.filter = 'blur(10px)';
                     ctxBlurred.drawImage(img, 0, 0);
 
-                    // Detectar bordas e desenhar
+                    // Chamando a função para detectar bordas
                     detectEdges();
                 };
-                img.src = e.target.result;
+                img.src = e.target.result; // Definindo a fonte da imagem como o conteúdo do arquivo
             };
 
-            reader.readAsDataURL(file);
+            reader.readAsDataURL(file); // Lendo o arquivo como uma URL de dados
         });
 
+        // Função para detectar bordas usando o operador de Sobel
         function detectEdges() {
+            // Obtendo os dados da imagem do canvas original
             const imageData = ctxOriginal.getImageData(0, 0, canvasOriginal.width, canvasOriginal.height);
-            const data = imageData.data;
+            const data = imageData.data; // Array contendo os dados da imagem (RGBA)
             const width = imageData.width;
             const height = imageData.height;
-            const sobelData = new Uint8ClampedArray(data.length);
+            const sobelData = new Uint8ClampedArray(data.length); // Array para armazenar os dados resultantes
 
-            // Sobel operator kernels
+            // Kernels do operador de Sobel
             const Gx = [
                 -1, 0, 1,
                 -2, 0, 2,
@@ -80,36 +92,38 @@
                  1,  2,  1
             ];
 
-            // Apply Sobel filter
+            // Aplicando o filtro de Sobel
             for (let y = 1; y < height - 1; y++) {
                 for (let x = 1; x < width - 1; x++) {
                     let pixelX = 0;
                     let pixelY = 0;
 
-                    // Apply Sobel kernels
+                    // Aplicando os kernels de Sobel
                     for (let ky = -1; ky <= 1; ky++) {
                         for (let kx = -1; kx <= 1; kx++) {
                             const pixel = (y + ky) * width + (x + kx);
                             const r = data[pixel * 4];
                             const g = data[pixel * 4 + 1];
                             const b = data[pixel * 4 + 2];
-                            const gray = (r + g + b) / 3;
+                            const gray = (r + g + b) / 3; // Convertendo o pixel para escala de cinza
 
+                            // Calculando os gradientes em X e Y
                             pixelX += gray * Gx[(ky + 1) * 3 + (kx + 1)];
                             pixelY += gray * Gy[(ky + 1) * 3 + (kx + 1)];
                         }
                     }
 
-                    // Calculate gradient magnitude
+                    // Calculando a magnitude do gradiente
                     const magnitude = Math.sqrt(pixelX * pixelX + pixelY * pixelY) >>> 0;
 
-                    // Set pixel data
+                    // Definindo os dados do pixel no array sobelData
                     const index = (y * width + x) * 4;
                     sobelData[index] = sobelData[index + 1] = sobelData[index + 2] = magnitude;
-                    sobelData[index + 3] = 255; // Alpha
+                    sobelData[index + 3] = 255; // Definindo o canal alfa como 255 (totalmente opaco)
                 }
             }
 
+            // Desenhando os dados processados no canvas de bordas
             ctxEdges.putImageData(new ImageData(sobelData, width, height), 0, 0);
         }
     </script>
